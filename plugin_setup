@@ -3,7 +3,7 @@
 # Tailscale Plugin Setup Script for FPP
 # This script handles installation, startup, and shutdown of Tailscale
 
-PLUGIN_NAME="fpp-tailscale"
+PLUGIN_NAME="testing-tailscale-fpp"
 PLUGIN_DIR="/opt/fpp/plugins/${PLUGIN_NAME}"
 CONFIG_FILE="${PLUGIN_DIR}/config.json"
 LOG_FILE="/var/log/fpp-tailscale.log"
