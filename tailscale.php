@@ -1,30 +1,12 @@
-<?php
-/*
- * Tailscale Plugin Main Page
- * This file is loaded by FPP's plugin.php system
- */
-
-// Include the HTML content directly
-?>
 <!DOCTYPE html>
 <html>
 <head>
     <title>Tailscale Management</title>
-    <script src="jquery/jquery.js"></script>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background-color: #f5f5f5;
-        }
         .container {
             max-width: 800px;
             margin: 0 auto;
-            background: white;
             padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
         h1 {
             color: #333;
@@ -219,33 +201,33 @@
     </div>
 
     <script>
-        // Get plugin path for API calls
-        var pluginPath = '/plugin.php?plugin=testing-tailscale-fpp&nopage=1&page=';
+        // Build the correct API path for this plugin
+        var apiBase = 'plugin.php?plugin=testing-tailscale-fpp&nopage=1&page=api.php';
         
         // Load status on page load
-        $(document).ready(function() {
+        jQuery(document).ready(function($) {
             loadConfig();
             refreshStatus();
         });
 
         function loadConfig() {
-            $.get(pluginPath + 'api.php?action=getConfig', function(data) {
+            jQuery.get(apiBase + '&action=getConfig', function(data) {
                 if (data.success) {
-                    $('#auto-connect').prop('checked', data.config.auto_connect);
-                    $('#accept-routes').prop('checked', data.config.accept_routes);
-                    $('#hostname-input').val(data.config.hostname || 'fpp-player');
+                    jQuery('#auto-connect').prop('checked', data.config.auto_connect);
+                    jQuery('#accept-routes').prop('checked', data.config.accept_routes);
+                    jQuery('#hostname-input').val(data.config.hostname || 'fpp-player');
                 }
             });
         }
 
         function saveConfig() {
             const config = {
-                auto_connect: $('#auto-connect').is(':checked'),
-                accept_routes: $('#accept-routes').is(':checked'),
-                hostname: $('#hostname-input').val()
+                auto_connect: jQuery('#auto-connect').is(':checked'),
+                accept_routes: jQuery('#accept-routes').is(':checked'),
+                hostname: jQuery('#hostname-input').val()
             };
             
-            $.post(pluginPath + 'api.php?action=saveConfig', JSON.stringify(config), function(data) {
+            jQuery.post(apiBase + '&action=saveConfig', JSON.stringify(config), function(data) {
                 if (data.success) {
                     alert('Configuration saved successfully!');
                 } else {
@@ -255,47 +237,47 @@
         }
 
         function refreshStatus() {
-            $.get(pluginPath + 'api.php?action=getStatus', function(data) {
-                $('#loading').hide();
-                $('#content').show();
+            jQuery.get(apiBase + '&action=getStatus', function(data) {
+                jQuery('#loading').hide();
+                jQuery('#content').show();
                 
                 if (data.success) {
                     const status = data.status;
                     
                     if (status.connected) {
-                        $('#status-box').removeClass('disconnected').addClass('connected');
-                        $('#status-text').html('<strong>✓ Connected to Tailscale</strong>');
-                        $('#connection-info').show();
-                        $('#tailscale-ip').text(status.ip || 'N/A');
-                        $('#hostname').text(status.hostname || 'N/A');
-                        $('#connection-status').text(status.status || 'Connected');
-                        $('#btn-connect').hide();
-                        $('#btn-disconnect').show();
-                        $('#auth-url-box').hide();
+                        jQuery('#status-box').removeClass('disconnected').addClass('connected');
+                        jQuery('#status-text').html('<strong>✓ Connected to Tailscale</strong>');
+                        jQuery('#connection-info').show();
+                        jQuery('#tailscale-ip').text(status.ip || 'N/A');
+                        jQuery('#hostname').text(status.hostname || 'N/A');
+                        jQuery('#connection-status').text(status.status || 'Connected');
+                        jQuery('#btn-connect').hide();
+                        jQuery('#btn-disconnect').show();
+                        jQuery('#auth-url-box').hide();
                     } else {
-                        $('#status-box').removeClass('connected').addClass('disconnected');
-                        $('#status-text').html('<strong>✗ Disconnected from Tailscale</strong>');
-                        $('#connection-info').hide();
-                        $('#btn-connect').show();
-                        $('#btn-disconnect').hide();
+                        jQuery('#status-box').removeClass('connected').addClass('disconnected');
+                        jQuery('#status-text').html('<strong>✗ Disconnected from Tailscale</strong>');
+                        jQuery('#connection-info').hide();
+                        jQuery('#btn-connect').show();
+                        jQuery('#btn-disconnect').hide();
                         
                         if (status.auth_url) {
-                            $('#auth-url-box').show();
-                            $('#auth-url-link').attr('href', status.auth_url).text(status.auth_url);
+                            jQuery('#auth-url-box').show();
+                            jQuery('#auth-url-link').attr('href', status.auth_url).text(status.auth_url);
                         } else {
-                            $('#auth-url-box').hide();
+                            jQuery('#auth-url-box').hide();
                         }
                     }
                 } else {
-                    $('#status-box').removeClass('connected').addClass('disconnected');
-                    $('#status-text').html('<strong>Error:</strong> ' + data.message);
+                    jQuery('#status-box').removeClass('connected').addClass('disconnected');
+                    jQuery('#status-text').html('<strong>Error:</strong> ' + data.message);
                 }
             });
         }
 
         function connectTailscale() {
-            $('#status-text').html('Connecting to Tailscale...');
-            $.post(pluginPath + 'api.php?action=connect', function(data) {
+            jQuery('#status-text').html('Connecting to Tailscale...');
+            jQuery.post(apiBase + '&action=connect', function(data) {
                 if (data.success) {
                     setTimeout(refreshStatus, 2000);
                 } else {
@@ -307,8 +289,8 @@
 
         function disconnectTailscale() {
             if (confirm('Are you sure you want to disconnect from Tailscale?')) {
-                $('#status-text').html('Disconnecting from Tailscale...');
-                $.post(pluginPath + 'api.php?action=disconnect', function(data) {
+                jQuery('#status-text').html('Disconnecting from Tailscale...');
+                jQuery.post(apiBase + '&action=disconnect', function(data) {
                     if (data.success) {
                         setTimeout(refreshStatus, 2000);
                     } else {
@@ -320,12 +302,12 @@
         }
 
         function refreshLogs() {
-            $.get(pluginPath + 'api.php?action=getLogs', function(data) {
+            jQuery.get(apiBase + '&action=getLogs', function(data) {
                 if (data.success) {
-                    $('#log-content').text(data.logs || 'No logs available');
-                    $('#log-content').scrollTop($('#log-content')[0].scrollHeight);
+                    jQuery('#log-content').text(data.logs || 'No logs available');
+                    jQuery('#log-content').scrollTop(jQuery('#log-content')[0].scrollHeight);
                 } else {
-                    $('#log-content').text('Error loading logs');
+                    jQuery('#log-content').text('Error loading logs');
                 }
             });
         }
