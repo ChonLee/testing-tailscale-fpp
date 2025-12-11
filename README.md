@@ -1,3 +1,5 @@
+CURRENT STATUS ***BROKEN***
+
 # FPP Tailscale Plugin
 
 A Falcon Player (FPP) plugin that integrates Tailscale VPN for secure remote access to your FPP instance.
