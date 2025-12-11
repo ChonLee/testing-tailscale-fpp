@@ -1,12 +1,21 @@
+<?php
+/*
+ * Tailscale Plugin Main Page
+ * This file is loaded by FPP's plugin.php system
+ */
+
+// Include the HTML content directly
+?>
 <!DOCTYPE html>
 <html>
 <head>
     <title>Tailscale Management</title>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="jquery/jquery.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
-            margin: 20px;
+            margin: 0;
+            padding: 20px;
             background-color: #f5f5f5;
         }
         .container {
@@ -210,6 +219,9 @@
     </div>
 
     <script>
+        // Get plugin path for API calls
+        var pluginPath = '/plugin.php?plugin=testing-tailscale-fpp&nopage=1&page=';
+        
         // Load status on page load
         $(document).ready(function() {
             loadConfig();
@@ -217,7 +229,7 @@
         });
 
         function loadConfig() {
-            $.get('api.php?action=getConfig', function(data) {
+            $.get(pluginPath + 'api.php?action=getConfig', function(data) {
                 if (data.success) {
                     $('#auto-connect').prop('checked', data.config.auto_connect);
                     $('#accept-routes').prop('checked', data.config.accept_routes);
@@ -233,7 +245,7 @@
                 hostname: $('#hostname-input').val()
             };
             
-            $.post('api.php?action=saveConfig', JSON.stringify(config), function(data) {
+            $.post(pluginPath + 'api.php?action=saveConfig', JSON.stringify(config), function(data) {
                 if (data.success) {
                     alert('Configuration saved successfully!');
                 } else {
@@ -243,7 +255,7 @@
         }
 
         function refreshStatus() {
-            $.get('api.php?action=getStatus', function(data) {
+            $.get(pluginPath + 'api.php?action=getStatus', function(data) {
                 $('#loading').hide();
                 $('#content').show();
                 
@@ -283,7 +295,7 @@
 
         function connectTailscale() {
             $('#status-text').html('Connecting to Tailscale...');
-            $.post('api.php?action=connect', function(data) {
+            $.post(pluginPath + 'api.php?action=connect', function(data) {
                 if (data.success) {
                     setTimeout(refreshStatus, 2000);
                 } else {
@@ -296,7 +308,7 @@
         function disconnectTailscale() {
             if (confirm('Are you sure you want to disconnect from Tailscale?')) {
                 $('#status-text').html('Disconnecting from Tailscale...');
-                $.post('api.php?action=disconnect', function(data) {
+                $.post(pluginPath + 'api.php?action=disconnect', function(data) {
                     if (data.success) {
                         setTimeout(refreshStatus, 2000);
                     } else {
@@ -308,7 +320,7 @@
         }
 
         function refreshLogs() {
-            $.get('api.php?action=getLogs', function(data) {
+            $.get(pluginPath + 'api.php?action=getLogs', function(data) {
                 if (data.success) {
                     $('#log-content').text(data.logs || 'No logs available');
                     $('#log-content').scrollTop($('#log-content')[0].scrollHeight);
