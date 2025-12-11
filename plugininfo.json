@@ -1,5 +1,5 @@
 {
-  "name": "fpp-tailscale",
+  "name": "testing-tailscale-fpp",
   "description": "Tailscale VPN integration for FPP - secure remote access to your Falcon Player",
   "version": "1.0.0",
   "author": "John Myers",
