@@ -11,31 +11,31 @@
     {
       "minFPPVersion": "3.0",
       "maxFPPVersion": "4.99",
-      "branch": "preV7",
+      "branch": "main",
       "sha": ""
     },
     {
       "minFPPVersion": "6.0",
       "maxFPPVersion": "6.99",
-      "branch": "preV7",
+      "branch": "main",
       "sha": ""
     },
     {
       "minFPPVersion": "7.0",
       "maxFPPVersion": "7.99",
-      "branch": "master",
+      "branch": "main",
       "sha": ""
     },
     {
       "minFPPVersion": "8.0",
       "maxFPPVersion": "8.99",
-      "branch": "master",
+      "branch": "main",
       "sha": ""
     },
     {
       "minFPPVersion": "9.0",
       "maxFPPVersion": "0",
-      "branch": "master",
+      "branch": "main",
       "sha": ""
     }
   ]
