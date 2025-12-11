@@ -69,11 +69,11 @@ EOF
     log "Default configuration created"
 fi
 
-# Enable and start tailscaled service
-log "Configuring tailscaled service..."
+# Start tailscaled daemon
+log "Starting tailscaled daemon..."
 
-# Check if systemd is available
-if command -v systemctl &> /dev/null; then
+# Check if systemd is actually available and working
+if pidof systemd > /dev/null 2>&1 && command -v systemctl &> /dev/null; then
     log "Using systemd to manage tailscaled..."
     
     # Enable the service to start on boot
@@ -87,42 +87,47 @@ if command -v systemctl &> /dev/null; then
     
     # Check if service is running
     if systemctl is-active --quiet tailscaled; then
-        log "Tailscaled service is running"
+        log "Tailscaled service is running via systemd"
     else
-        log "WARNING: Tailscaled service may not have started properly"
-        systemctl status tailscaled 2>&1 | tee -a "$LOG_FILE"
+        log "WARNING: Tailscaled service may not have started via systemd"
     fi
 else
     log "Systemd not available, starting tailscaled manually..."
     
-    # Start tailscaled daemon manually
-    if ! pgrep -x "tailscaled" > /dev/null; then
-        log "Starting tailscaled daemon..."
-        tailscaled --state=/var/lib/tailscale/tailscaled.state --socket=/var/run/tailscale/tailscaled.sock > /dev/null 2>&1 &
-        sleep 2
-        
-        if pgrep -x "tailscaled" > /dev/null; then
-            log "Tailscaled daemon started successfully"
-        else
-            log "WARNING: Failed to start tailscaled daemon"
-        fi
+    # Kill any existing tailscaled processes
+    pkill -x tailscaled 2>/dev/null || true
+    sleep 1
+    
+    # Start tailscaled daemon manually in background
+    nohup tailscaled --state=/var/lib/tailscale/tailscaled.state --socket=/var/run/tailscale/tailscaled.sock > /dev/null 2>&1 &
+    
+    # Wait for daemon to start
+    sleep 3
+    
+    if pgrep -x "tailscaled" > /dev/null; then
+        log "Tailscaled daemon started successfully (manual mode)"
     else
-        log "Tailscaled daemon is already running"
+        log "ERROR: Failed to start tailscaled daemon manually"
+        exit 1
     fi
 fi
 
 # Final verification
 log "Verifying installation..."
 if pgrep -x "tailscaled" > /dev/null; then
-    log "✓ Tailscaled daemon is running"
+    log "✓ Tailscaled daemon is running (PID: $(pgrep -x tailscaled))"
 else
-    log "✗ Tailscaled daemon is NOT running - please start manually with: sudo systemctl start tailscaled"
+    log "✗ Tailscaled daemon is NOT running"
+    exit 1
 fi
 
-if tailscale status &> /dev/null; then
-    log "✓ Tailscale is responsive"
+# Test if tailscale CLI can communicate with daemon
+log "Testing Tailscale CLI communication..."
+if timeout 5 tailscale status &> /dev/null; then
+    log "✓ Tailscale CLI is responsive"
 else
-    log "⚠ Tailscale status check inconclusive (may need authentication)"
+    # This is expected if not yet authenticated
+    log "⚠ Tailscale status check inconclusive (normal if not yet authenticated)"
 fi
 
 log "=== Tailscale Plugin Installation Complete ==="
