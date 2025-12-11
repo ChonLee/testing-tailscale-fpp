@@ -1,8 +1,8 @@
 <?php
-# Tailscale Plugin Menu Configuration
+// Tailscale Plugin Menu
 
-$menuEntries = Array(
-    Array(
+$menuEntries = array(
+    array(
         'text' => 'Tailscale VPN',
         'type' => 'status',
         'page' => 'tailscale.php',
@@ -10,9 +10,6 @@ $menuEntries = Array(
     )
 );
 
-# Display menu entries
-foreach ($menuEntries as $menuEntry)
-{
+foreach ($menuEntries as $menuEntry) {
     echo "<li><a href='plugin.php?plugin=" . $plugin . "&page=" . $menuEntry['page'] . "'>" . $menuEntry['text'] . "</a></li>";
 }
-?>
