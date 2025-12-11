@@ -1,8 +1,18 @@
 {
-  "name": "testing-tailscale-fpp",
-  "description": "Tailscale VPN integration for FPP - secure remote access to your Falcon Player",
-  "version": "1.0.0",
-  "author": "John Myers",
-  "homepage": "https://github.com/ChonLee/testing-tailscale-fpp",
-  "allowUpdates": true
+  "repoName": "testing-tailscale-fpp",
+  "name": "Tailscale VPN",
+  "author": "ChonLee",
+  "description": "Tailscale VPN integration for FPP - secure remote access to your Falcon Player instance with automatic connection on boot and web-based management interface.",
+  "homeURL": "https://github.com/ChonLee/testing-tailscale-fpp",
+  "srcURL": "https://github.com/ChonLee/testing-tailscale-fpp.git",
+  "bugURL": "https://github.com/ChonLee/testing-tailscale-fpp/issues",
+  "allowUpdates": 1,
+  "versions": [
+    {
+      "minFPPVersion": "7.0",
+      "maxFPPVersion": "0",
+      "branch": "main",
+      "sha": ""
+    }
+  ]
 }
