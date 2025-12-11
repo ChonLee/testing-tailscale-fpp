@@ -21,11 +21,39 @@ get_config_value() {
     fi
 }
 
-# Start tailscaled daemon if not running
-if ! pgrep -x "tailscaled" > /dev/null; then
-    log "Starting tailscaled daemon..."
-    tailscaled --state=/var/lib/tailscale/tailscaled.state > /dev/null 2>&1 &
-    sleep 2
+# Ensure tailscaled is running
+log "Checking if tailscaled is running..."
+
+if command -v systemctl &> /dev/null; then
+    # Use systemd if available
+    if ! systemctl is-active --quiet tailscaled; then
+        log "Tailscaled not running, starting with systemctl..."
+        systemctl start tailscaled 2>&1 >> "$LOG_FILE"
+        sleep 2
+    fi
+    
+    if systemctl is-active --quiet tailscaled; then
+        log "Tailscaled service is running"
+    else
+        log "ERROR: Failed to start tailscaled service"
+        exit 1
+    fi
+else
+    # Fallback to manual start
+    if ! pgrep -x "tailscaled" > /dev/null; then
+        log "Starting tailscaled daemon manually..."
+        tailscaled --state=/var/lib/tailscale/tailscaled.state --socket=/var/run/tailscale/tailscaled.sock > /dev/null 2>&1 &
+        sleep 2
+        
+        if pgrep -x "tailscaled" > /dev/null; then
+            log "Tailscaled daemon started successfully"
+        else
+            log "ERROR: Failed to start tailscaled daemon"
+            exit 1
+        fi
+    else
+        log "Tailscaled daemon is already running"
+    fi
 fi
 
 # Check if auto-connect is enabled
@@ -33,14 +61,27 @@ auto_connect=$(get_config_value "auto_connect")
 accept_routes=$(get_config_value "accept_routes")
 hostname=$(get_config_value "hostname")
 
-if [ "$auto_connect" = "true" ]; then
+if [ "$auto_connect" = "true" ] || [ "$auto_connect" = "True" ]; then
     log "Auto-connect enabled, attempting to connect..."
     
     # Check if already authenticated
     if tailscale status > /dev/null 2>&1; then
         log "Already authenticated, bringing up connection..."
-        tailscale up --hostname="${hostname:-fpp-player}" --accept-routes=${accept_routes:-false} > /dev/null 2>&1
-        log "Tailscale connection established"
+        
+        # Build tailscale up command
+        UP_CMD="tailscale up --hostname=${hostname:-fpp-player}"
+        
+        if [ "$accept_routes" = "true" ] || [ "$accept_routes" = "True" ]; then
+            UP_CMD="$UP_CMD --accept-routes"
+        fi
+        
+        $UP_CMD >> "$LOG_FILE" 2>&1
+        
+        if [ $? -eq 0 ]; then
+            log "Tailscale connection established"
+        else
+            log "WARNING: Tailscale up command had non-zero exit code (may still be connected)"
+        fi
     else
         log "Not authenticated - manual authentication required via web UI"
     fi
