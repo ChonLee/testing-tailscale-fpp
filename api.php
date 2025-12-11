@@ -45,7 +45,7 @@ function readConfig() {
  */
 function writeConfig($config) {
     global $CONFIG_FILE;
-    return file_put_contents($CONFIG_FILE, json_stringify($config, JSON_PRETTY_PRINT)) !== false;
+    return file_put_contents($CONFIG_FILE, json_encode($config, JSON_PRETTY_PRINT)) !== false;
 }
 
 /**
