@@ -1,0 +1,6 @@
+{
+    "auto_connect": false,
+    "accept_routes": false,
+    "advertise_exit": false,
+    "hostname": "fpp-player"
+}

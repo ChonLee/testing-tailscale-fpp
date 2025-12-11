@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Tailscale Management</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        .status-box {
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+            border-left: 4px solid #2196F3;
+            background-color: #E3F2FD;
+        }
+        .status-box.connected {
+            border-left-color: #4CAF50;
+            background-color: #E8F5E9;
+        }
+        .status-box.disconnected {
+            border-left-color: #F44336;
+            background-color: #FFEBEE;
+        }
+        .button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+        }
+        .button:hover {
+            background-color: #45a049;
+        }
+        .button.secondary {
+            background-color: #2196F3;
+        }
+        .button.secondary:hover {
+            background-color: #0b7dda;
+        }
+        .button.danger {
+            background-color: #F44336;
+        }
+        .button.danger:hover {
+            background-color: #da190b;
+        }
+        .form-group {
+            margin: 15px 0;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        .form-group input[type="text"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        .form-group input[type="checkbox"] {
+            margin-right: 8px;
+        }
+        .info-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        .info-table td {
+            padding: 8px;
+            border-bottom: 1px solid #ddd;
+        }
+        .info-table td:first-child {
+            font-weight: bold;
+            width: 30%;
+            color: #555;
+        }
+        .auth-url {
+            background-color: #FFF9C4;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 15px 0;
+            word-break: break-all;
+        }
+        .auth-url a {
+            color: #1976D2;
+            text-decoration: none;
+        }
+        .auth-url a:hover {
+            text-decoration: underline;
+        }
+        .log-box {
+            background-color: #263238;
+            color: #AED581;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin: 15px 0;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 Tailscale VPN Management</h1>
+        
+        <div id="loading" class="loading">
+            Loading Tailscale status...
+        </div>
+        
+        <div id="content" style="display:none;">
+            <!-- Status Section -->
+            <div id="status-section">
+                <h2>Connection Status</h2>
+                <div id="status-box" class="status-box">
+                    <p id="status-text">Checking status...</p>
+                </div>
+                
+                <div id="connection-info" style="display:none;">
+                    <table class="info-table">
+                        <tr>
+                            <td>Tailscale IP:</td>
+                            <td id="tailscale-ip">-</td>
+                        </tr>
+                        <tr>
+                            <td>Hostname:</td>
+                            <td id="hostname">-</td>
+                        </tr>
+                        <tr>
+                            <td>Status:</td>
+                            <td id="connection-status">-</td>
+                        </tr>
+                    </table>
+                </div>
+                
+                <div id="auth-url-box" class="auth-url" style="display:none;">
+                    <strong>⚠️ Authentication Required</strong>
+                    <p>Please authenticate your device by clicking the link below:</p>
+                    <a id="auth-url-link" href="#" target="_blank">Authenticate with Tailscale</a>
+                </div>
+                
+                <div>
+                    <button id="btn-connect" class="button" onclick="connectTailscale()">Connect</button>
+                    <button id="btn-disconnect" class="button danger" onclick="disconnectTailscale()">Disconnect</button>
+                    <button id="btn-refresh" class="button secondary" onclick="refreshStatus()">Refresh Status</button>
+                </div>
+            </div>
+            
+            <!-- Configuration Section -->
+            <div id="config-section">
+                <h2>Configuration</h2>
+                
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="auto-connect" onchange="saveConfig()">
+                        Auto-connect on boot
+                    </label>
+                </div>
+                
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="accept-routes" onchange="saveConfig()">
+                        Accept subnet routes
+                    </label>
+                </div>
+                
+                <div class="form-group">
+                    <label for="hostname-input">Device Hostname:</label>
+                    <input type="text" id="hostname-input" placeholder="fpp-player" value="fpp-player">
+                    <button class="button secondary" onclick="saveConfig()" style="margin-top: 10px;">Save Configuration</button>
+                </div>
+            </div>
+            
+            <!-- Logs Section -->
+            <div id="logs-section">
+                <h2>Recent Logs</h2>
+                <div id="log-content" class="log-box">
+                    No logs available
+                </div>
+                <button class="button secondary" onclick="refreshLogs()">Refresh Logs</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Load status on page load
+        $(document).ready(function() {
+            loadConfig();
+            refreshStatus();
+        });
+
+        function loadConfig() {
+            $.get('api.php?action=getConfig', function(data) {
+                if (data.success) {
+                    $('#auto-connect').prop('checked', data.config.auto_connect);
+                    $('#accept-routes').prop('checked', data.config.accept_routes);
+                    $('#hostname-input').val(data.config.hostname || 'fpp-player');
+                }
+            });
+        }
+
+        function saveConfig() {
+            const config = {
+                auto_connect: $('#auto-connect').is(':checked'),
+                accept_routes: $('#accept-routes').is(':checked'),
+                hostname: $('#hostname-input').val()
+            };
+            
+            $.post('api.php?action=saveConfig', JSON.stringify(config), function(data) {
+                if (data.success) {
+                    alert('Configuration saved successfully!');
+                } else {
+                    alert('Error saving configuration: ' + data.message);
+                }
+            });
+        }
+
+        function refreshStatus() {
+            $.get('api.php?action=getStatus', function(data) {
+                $('#loading').hide();
+                $('#content').show();
+                
+                if (data.success) {
+                    const status = data.status;
+                    
+                    if (status.connected) {
+                        $('#status-box').removeClass('disconnected').addClass('connected');
+                        $('#status-text').html('<strong>✓ Connected to Tailscale</strong>');
+                        $('#connection-info').show();
+                        $('#tailscale-ip').text(status.ip || 'N/A');
+                        $('#hostname').text(status.hostname || 'N/A');
+                        $('#connection-status').text(status.status || 'Connected');
+                        $('#btn-connect').hide();
+                        $('#btn-disconnect').show();
+                        $('#auth-url-box').hide();
+                    } else {
+                        $('#status-box').removeClass('connected').addClass('disconnected');
+                        $('#status-text').html('<strong>✗ Disconnected from Tailscale</strong>');
+                        $('#connection-info').hide();
+                        $('#btn-connect').show();
+                        $('#btn-disconnect').hide();
+                        
+                        if (status.auth_url) {
+                            $('#auth-url-box').show();
+                            $('#auth-url-link').attr('href', status.auth_url).text(status.auth_url);
+                        } else {
+                            $('#auth-url-box').hide();
+                        }
+                    }
+                } else {
+                    $('#status-box').removeClass('connected').addClass('disconnected');
+                    $('#status-text').html('<strong>Error:</strong> ' + data.message);
+                }
+            });
+        }
+
+        function connectTailscale() {
+            $('#status-text').html('Connecting to Tailscale...');
+            $.post('api.php?action=connect', function(data) {
+                if (data.success) {
+                    setTimeout(refreshStatus, 2000);
+                } else {
+                    alert('Error connecting: ' + data.message);
+                    refreshStatus();
+                }
+            });
+        }
+
+        function disconnectTailscale() {
+            if (confirm('Are you sure you want to disconnect from Tailscale?')) {
+                $('#status-text').html('Disconnecting from Tailscale...');
+                $.post('api.php?action=disconnect', function(data) {
+                    if (data.success) {
+                        setTimeout(refreshStatus, 2000);
+                    } else {
+                        alert('Error disconnecting: ' + data.message);
+                        refreshStatus();
+                    }
+                });
+            }
+        }
+
+        function refreshLogs() {
+            $.get('api.php?action=getLogs', function(data) {
+                if (data.success) {
+                    $('#log-content').text(data.logs || 'No logs available');
+                    $('#log-content').scrollTop($('#log-content')[0].scrollHeight);
+                } else {
+                    $('#log-content').text('Error loading logs');
+                }
+            });
+        }
+        
+        // Auto-refresh status every 30 seconds
+        setInterval(refreshStatus, 30000);
+        
+        // Load logs initially
+        setTimeout(refreshLogs, 1000);
+    </script>
+</body>
+</html>

@@ -1,0 +1,134 @@
+#!/bin/bash
+#
+# Tailscale Plugin Setup Script for FPP
+# This script handles installation, startup, and shutdown of Tailscale
+
+PLUGIN_NAME="fpp-tailscale"
+PLUGIN_DIR="/opt/fpp/plugins/${PLUGIN_NAME}"
+CONFIG_FILE="${PLUGIN_DIR}/config.json"
+LOG_FILE="/var/log/fpp-tailscale.log"
+
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$LOG_FILE"
+}
+
+# Function to check if Tailscale is installed
+is_tailscale_installed() {
+    command -v tailscale >/dev/null 2>&1
+}
+
+# Function to install Tailscale
+install_tailscale() {
+    log "Installing Tailscale..."
+    
+    # Check if running in Docker (skip installation if tailscale is already available)
+    if [ -f /.dockerenv ]; then
+        log "Running in Docker environment"
+        # In Docker, we'll need tailscale to be pre-installed or use tailscale userspace mode
+    fi
+    
+    # Install Tailscale using official script
+    if ! is_tailscale_installed; then
+        curl -fsSL https://tailscale.com/install.sh | sh
+        if [ $? -eq 0 ]; then
+            log "Tailscale installed successfully"
+        else
+            log "ERROR: Failed to install Tailscale"
+            return 1
+        fi
+    else
+        log "Tailscale is already installed"
+    fi
+    
+    return 0
+}
+
+# Function to read config value
+get_config_value() {
+    local key=$1
+    if [ -f "$CONFIG_FILE" ]; then
+        python3 -c "import json; print(json.load(open('$CONFIG_FILE')).get('$key', ''))" 2>/dev/null
+    fi
+}
+
+# Function to check if Tailscale is authenticated
+is_authenticated() {
+    tailscale status >/dev/null 2>&1
+    return $?
+}
+
+# Function to start Tailscale
+start_tailscale() {
+    log "Starting Tailscale..."
+    
+    # Read configuration
+    local auto_connect=$(get_config_value "auto_connect")
+    local accept_routes=$(get_config_value "accept_routes")
+    local advertise_exit=$(get_config_value "advertise_exit")
+    
+    # Start tailscaled daemon if not running
+    if ! pgrep -x "tailscaled" > /dev/null; then
+        log "Starting tailscaled daemon..."
+        tailscaled --state=/var/lib/tailscale/tailscaled.state >/dev/null 2>&1 &
+        sleep 2
+    fi
+    
+    # Check if auto-connect is enabled and we're authenticated
+    if [ "$auto_connect" = "true" ] && is_authenticated; then
+        log "Auto-connect enabled and already authenticated"
+        tailscale up --accept-routes=${accept_routes:-false} >/dev/null 2>&1
+    elif [ "$auto_connect" = "true" ]; then
+        log "Auto-connect enabled but not authenticated - please authenticate via web UI"
+    fi
+}
+
+# Function to stop Tailscale
+stop_tailscale() {
+    log "Stopping Tailscale..."
+    tailscale down >/dev/null 2>&1
+}
+
+# Main script logic
+case "$1" in
+    install)
+        log "=== Installing Tailscale Plugin ==="
+        install_tailscale
+        
+        # Create default config if it doesn't exist
+        if [ ! -f "$CONFIG_FILE" ]; then
+            cat > "$CONFIG_FILE" << EOF
+{
+    "auto_connect": false,
+    "accept_routes": false,
+    "advertise_exit": false,
+    "hostname": "fpp-player"
+}
+EOF
+            log "Created default configuration"
+        fi
+        ;;
+        
+    start)
+        log "=== Starting Tailscale Plugin ==="
+        start_tailscale
+        ;;
+        
+    stop)
+        log "=== Stopping Tailscale Plugin ==="
+        stop_tailscale
+        ;;
+        
+    uninstall)
+        log "=== Uninstalling Tailscale Plugin ==="
+        stop_tailscale
+        # Note: We don't uninstall tailscale itself as user might want to keep it
+        log "Plugin uninstalled (Tailscale binary kept)"
+        ;;
+        
+    *)
+        echo "Usage: $0 {install|start|stop|uninstall}"
+        exit 1
+        ;;
+esac
+
+exit 0

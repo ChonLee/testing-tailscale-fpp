@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  fpp:
+    image: falconchristmas/fpp:latest
+    container_name: fpp-tailscale-test
+    privileged: true
+    network_mode: host
+    volumes:
+      # Mount the plugin directory
+      - ./fpp-tailscale-plugin:/opt/fpp/plugins/fpp-tailscale:rw
+      # FPP configuration and media
+      - fpp-config:/home/fpp/media/config
+      - fpp-media:/home/fpp/media
+      - fpp-logs:/var/log
+      # Device access for Tailscale
+      - /dev/net/tun:/dev/net/tun
+      - /dev:/dev:ro
+    environment:
+      - TZ=America/New_York
+      - TAILSCALE_STATE_DIR=/var/lib/tailscale
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    devices:
+      - /dev/net/tun
+    ports:
+      - "8080:80"
+      - "8443:443"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/api/fppd/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  fpp-config:
+    driver: local
+  fpp-media:
+    driver: local
+  fpp-logs:
+    driver: local
