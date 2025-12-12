@@ -65,7 +65,12 @@ function readConfig() {
  * Write configuration file (INI format)
  */
 function writeConfig($config) {
-    global $CONFIG_FILE;
+    global $CONFIG_FILE, $CONFIG_DIR;
+    
+    // Ensure directory exists
+    if (!is_dir($CONFIG_DIR)) {
+        mkdir($CONFIG_DIR, 0777, true);
+    }
     
     $iniContent = "; Tailscale Plugin Configuration\n";
     $iniContent .= "; Generated: " . date('Y-m-d H:i:s') . "\n\n";
@@ -78,7 +83,15 @@ function writeConfig($config) {
         $iniContent .= "$key = $value\n";
     }
     
-    return file_put_contents($CONFIG_FILE, $iniContent) !== false;
+    // Write the file
+    $result = @file_put_contents($CONFIG_FILE, $iniContent);
+    
+    // Set proper permissions if file was created
+    if ($result !== false && file_exists($CONFIG_FILE)) {
+        @chmod($CONFIG_FILE, 0666);
+    }
+    
+    return $result !== false;
 }
 
 /**
