@@ -1,5 +1,10 @@
 <?php
 // Tailscale Plugin Menu
+// Only execute in proper plugin context to avoid breaking FPP
+
+if (!isset($plugin)) {
+    return;
+}
 
 $menuEntries = array(
     array(
@@ -11,5 +16,5 @@ $menuEntries = array(
 );
 
 foreach ($menuEntries as $menuEntry) {
-    echo "<li><a href='plugin.php?plugin=" . $plugin . "&page=" . $menuEntry['page'] . "'>" . $menuEntry['text'] . "</a></li>";
+    echo "<li><a href='plugin.php?plugin=" . htmlspecialchars($plugin) . "&page=" . htmlspecialchars($menuEntry['page']) . "'>" . htmlspecialchars($menuEntry['text']) . "</a></li>";
 }

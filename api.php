@@ -6,7 +6,7 @@
 
 header('Content-Type: application/json');
 
-$PLUGIN_DIR = "/opt/fpp/plugins/fpp-tailscale";
+$PLUGIN_DIR = "/opt/fpp/plugins/testing-tailscale-fpp";
 $CONFIG_FILE = "$PLUGIN_DIR/config.json";
 $LOG_FILE = "/var/log/fpp-tailscale.log";
 
@@ -62,33 +62,17 @@ function getTailscaleStatus() {
         ];
     }
     
-    // Get detailed status using tailscale status --json
-    $result = execCommand("tailscale status --json");
+    // Get text status first to check login state
+    $textStatus = execCommand("sudo tailscale status 2>&1");
+    $statusOutput = $textStatus['output'];
     
-    if ($result['return_code'] === 0) {
-        $status = json_decode($result['output'], true);
-        
-        if ($status && isset($status['Self'])) {
-            $self = $status['Self'];
-            return [
-                'connected' => true,
-                'daemon_running' => true,
-                'ip' => $self['TailscaleIPs'][0] ?? 'N/A',
-                'hostname' => $self['HostName'] ?? 'N/A',
-                'status' => 'Connected',
-                'online' => $self['Online'] ?? false,
-                'auth_url' => null
-            ];
-        }
-    }
-    
-    // Check if we need authentication
-    $authCheck = execCommand("tailscale status");
-    if (strpos($authCheck['output'], 'run `tailscale up`') !== false || 
-        strpos($authCheck['output'], 'Logged out') !== false) {
+    // Check if needs login/authentication
+    if (strpos($statusOutput, 'Logged out') !== false ||
+        strpos($statusOutput, 'NeedsLogin') !== false ||
+        strpos($statusOutput, 'run `tailscale up`') !== false) {
         
         // Try to get auth URL
-        $authResult = execCommand("tailscale up --timeout=1s 2>&1 || true");
+        $authResult = execCommand("sudo tailscale up --timeout=1s 2>&1 || true");
         $authUrl = null;
         
         // Extract URL from output
@@ -104,6 +88,34 @@ function getTailscaleStatus() {
         ];
     }
     
+    // Get detailed JSON status
+    $result = execCommand("sudo tailscale status --json");
+    
+    if ($result['return_code'] === 0) {
+        $status = json_decode($result['output'], true);
+        
+        if ($status && isset($status['Self'])) {
+            $self = $status['Self'];
+            
+            // Check if actually online and has an IP
+            $hasIP = !empty($self['TailscaleIPs']) && !empty($self['TailscaleIPs'][0]);
+            $isOnline = isset($self['Online']) && $self['Online'] === true;
+            
+            if ($hasIP && $isOnline) {
+                return [
+                    'connected' => true,
+                    'daemon_running' => true,
+                    'ip' => $self['TailscaleIPs'][0],
+                    'hostname' => $self['HostName'] ?? 'N/A',
+                    'status' => 'Connected',
+                    'online' => true,
+                    'auth_url' => null
+                ];
+            }
+        }
+    }
+    
+    // Default to disconnected
     return [
         'connected' => false,
         'daemon_running' => true,
@@ -125,7 +137,7 @@ function connectTailscale() {
         $args[] = '--hostname=' . escapeshellarg($config['hostname']);
     }
     
-    $cmd = "tailscale up " . implode(' ', $args);
+    $cmd = "sudo tailscale up " . implode(' ', $args);
     $result = execCommand($cmd);
     
     // Check if we got an auth URL
@@ -145,7 +157,7 @@ function connectTailscale() {
  * Disconnect from Tailscale
  */
 function disconnectTailscale() {
-    $result = execCommand("tailscale down");
+    $result = execCommand("sudo tailscale down");
     return [
         'success' => $result['return_code'] === 0,
         'message' => $result['output']
@@ -233,4 +245,3 @@ try {
         'message' => 'Error: ' . $e->getMessage()
     ]);
 }
-?>
