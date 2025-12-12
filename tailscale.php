@@ -202,7 +202,7 @@
 
     <script>
         // Build the correct API path for this plugin
-        var apiBase = 'plugin.php?plugin=testing-tailscale-fpp&nopage=1&page=api.php';
+        var apiBase = 'plugin.php?plugin=testing-tailscale-fpp&nopage=1&page=api-handler.php';
         
         // Load status on page load
         jQuery(document).ready(function($) {
@@ -278,9 +278,17 @@
         function connectTailscale() {
             jQuery('#status-text').html('Connecting to Tailscale...');
             jQuery.post(apiBase + '&action=connect', function(data) {
-                if (data.success) {
+                if (data.auth_url) {
+                    // Authentication required - show the URL
+                    jQuery('#status-text').html('<strong>Authentication Required</strong>');
+                    jQuery('#auth-url-box').show();
+                    jQuery('#auth-url-link').attr('href', data.auth_url).text(data.auth_url);
+                    alert('Please authenticate using the link shown below');
+                } else if (data.success) {
+                    // Connected successfully
                     setTimeout(refreshStatus, 2000);
                 } else {
+                    // Error
                     alert('Error connecting: ' + data.message);
                     refreshStatus();
                 }

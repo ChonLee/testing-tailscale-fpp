@@ -2,11 +2,17 @@
 /*
  * Tailscale Plugin API for FPP
  * Handles all backend operations for the Tailscale management interface
+ * 
+ * Called via: plugin.php?plugin=testing-tailscale-fpp&nopage=1&page=api-handler.php&action=...
  */
 
 header('Content-Type: application/json');
 
 $PLUGIN_DIR = "/opt/fpp/plugins/testing-tailscale-fpp";
+if (!is_dir($PLUGIN_DIR)) {
+    $PLUGIN_DIR = "/home/fpp/media/plugins/testing-tailscale-fpp";
+}
+
 $CONFIG_FILE = "$PLUGIN_DIR/config.json";
 $LOG_FILE = "/var/log/fpp-tailscale.log";
 
