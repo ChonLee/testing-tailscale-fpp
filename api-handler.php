@@ -36,11 +36,14 @@ function execCommand($cmd) {
 function readConfig() {
     global $CONFIG_FILE;
     
+    // Get system hostname as default
+    $systemHostname = trim(shell_exec('hostname') ?: 'fpp-player');
+    
     $defaults = [
         'auto_connect' => false,
         'accept_routes' => false,
         'advertise_exit' => false,
-        'hostname' => 'fpp-player'
+        'hostname' => $systemHostname
     ];
     
     if (file_exists($CONFIG_FILE)) {
@@ -54,7 +57,15 @@ function readConfig() {
                     $config[$key] = false;
                 }
             }
-            return array_merge($defaults, $config);
+            // Merge with defaults, but keep system hostname if not explicitly set
+            $merged = array_merge($defaults, $config);
+            
+            // If hostname in config is empty or default, use system hostname
+            if (empty($merged['hostname']) || $merged['hostname'] === 'fpp-player') {
+                $merged['hostname'] = $systemHostname;
+            }
+            
+            return $merged;
         }
     }
     

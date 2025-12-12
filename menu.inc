@@ -11,7 +11,7 @@
 $menuEntries = Array(
 	Array(
 		'text' => 'Tailscale VPN',
-		'type' => 'status',
+		'type' => 'content',
 		'page' => 'tailscale.php',
 		'wrap' => 1
 	)

@@ -50,14 +50,19 @@ auto_connect=$(get_config_value "auto_connect")
 accept_routes=$(get_config_value "accept_routes")
 hostname=$(get_config_value "hostname")
 
+# Use system hostname if not set or default
+if [ -z "$hostname" ] || [ "$hostname" = "fpp-player" ]; then
+    hostname=$(hostname)
+fi
+
 if [ "$auto_connect" = "true" ] || [ "$auto_connect" = "True" ]; then
     log "Auto-connect enabled"
     
     # Wait for daemon to be ready
     sleep 2
     
-    # Build tailscale up command
-    UP_CMD="sudo tailscale up --hostname=${hostname:-fpp-player}"
+    # Build tailscale up command with system hostname
+    UP_CMD="sudo tailscale up --hostname=${hostname}"
     
     if [ "$accept_routes" = "true" ] || [ "$accept_routes" = "True" ]; then
         UP_CMD="$UP_CMD --accept-routes"
@@ -65,7 +70,7 @@ if [ "$auto_connect" = "true" ] || [ "$auto_connect" = "True" ]; then
     
     # Execute connect
     if $UP_CMD >> "$LOG_FILE" 2>&1; then
-        log "Auto-connect successful"
+        log "Auto-connect successful with hostname: ${hostname}"
     else
         log "Auto-connect completed (may need authentication)"
     fi
