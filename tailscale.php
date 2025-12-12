@@ -113,8 +113,21 @@
         }
         .loading {
             text-align: center;
-            padding: 20px;
+            padding: 40px;
             color: #666;
+        }
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #4CAF50;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
     </style>
 </head>
@@ -123,7 +136,8 @@
         <h1>🔐 Tailscale VPN Management</h1>
         
         <div id="loading" class="loading">
-            Loading Tailscale status...
+            <div class="spinner"></div>
+            <p>Loading Tailscale status...</p>
         </div>
         
         <div id="content" style="display:none;">
@@ -161,6 +175,7 @@
                     <button id="btn-authenticate" class="button" onclick="authenticateTailscale()" style="display:none;">🔑 Authenticate</button>
                     <button id="btn-connect" class="button" onclick="connectTailscale()">Connect</button>
                     <button id="btn-disconnect" class="button danger" onclick="disconnectTailscale()">Disconnect</button>
+                    <button id="btn-reauth" class="button secondary" onclick="forceReauthenticate()" style="display:none;">🔄 Force Re-authenticate</button>
                     <button id="btn-refresh" class="button secondary" onclick="refreshStatus()">Refresh Status</button>
                 </div>
             </div>
@@ -186,6 +201,10 @@
                 <div class="form-group">
                     <label for="hostname-input">Device Hostname:</label>
                     <input type="text" id="hostname-input" placeholder="fpp-player" value="fpp-player">
+                    <small id="system-hostname-info" style="display:block; margin-top: 5px; color: #666;">
+                        Current system hostname: <strong id="system-hostname">Loading...</strong>
+                        <button class="button secondary" onclick="useSystemHostname()" style="padding: 5px 10px; font-size: 12px; margin-left: 10px;">Use System Hostname</button>
+                    </small>
                     <button class="button secondary" onclick="saveConfig()" style="margin-top: 10px;">Save Configuration</button>
                 </div>
             </div>
@@ -212,13 +231,35 @@
         });
 
         function loadConfig() {
-            jQuery.get(apiBase + '&action=getConfig', function(data) {
-                if (data.success) {
-                    jQuery('#auto-connect').prop('checked', data.config.auto_connect);
-                    jQuery('#accept-routes').prop('checked', data.config.accept_routes);
-                    jQuery('#hostname-input').val(data.config.hostname || 'fpp-player');
+            // Get system hostname first
+            jQuery.get(apiBase + '&action=getSystemInfo', function(sysInfo) {
+                if (sysInfo.success) {
+                    var systemHostname = sysInfo.hostname;
+                    jQuery('#system-hostname').text(systemHostname);
+                    
+                    // Then load saved config
+                    jQuery.get(apiBase + '&action=getConfig', function(data) {
+                        if (data.success) {
+                            jQuery('#auto-connect').prop('checked', data.config.auto_connect);
+                            jQuery('#accept-routes').prop('checked', data.config.accept_routes);
+                            
+                            // If saved hostname is empty or default, use system hostname
+                            var savedHostname = data.config.hostname;
+                            if (!savedHostname || savedHostname === 'fpp-player') {
+                                jQuery('#hostname-input').val(systemHostname);
+                            } else {
+                                jQuery('#hostname-input').val(savedHostname);
+                            }
+                        }
+                    });
                 }
             });
+        }
+
+        function useSystemHostname() {
+            var systemHostname = jQuery('#system-hostname').text();
+            jQuery('#hostname-input').val(systemHostname);
+            saveConfig();
         }
 
         function saveConfig() {
@@ -265,6 +306,7 @@
                         jQuery('#connection-status').text(status.status || 'Connected');
                         jQuery('#btn-authenticate').hide();
                         jQuery('#btn-connect').hide();
+                        jQuery('#btn-reauth').hide();
                         jQuery('#btn-disconnect').show();
                         jQuery('#auth-url-box').hide();
                     } else {
@@ -277,12 +319,14 @@
                             jQuery('#status-text').html('<strong>✗ Authentication Required</strong><br><small>' + (status.status || 'Not logged in') + '</small>');
                             jQuery('#btn-authenticate').show();
                             jQuery('#btn-connect').hide();
+                            jQuery('#btn-reauth').hide();
                             jQuery('#auth-url-box').show();
                             jQuery('#auth-url-link').attr('href', status.auth_url).text(status.auth_url);
                         } else {
                             jQuery('#status-text').html('<strong>✗ Disconnected from Tailscale</strong><br><small>' + (status.status || 'Ready to connect') + '</small>');
                             jQuery('#btn-authenticate').hide();
                             jQuery('#btn-connect').show();
+                            jQuery('#btn-reauth').show(); // Show re-auth option
                             jQuery('#auth-url-box').hide();
                         }
                     }
@@ -327,6 +371,20 @@
                     refreshStatus();
                 }
             });
+        }
+
+        function forceReauthenticate() {
+            if (confirm('This will log out and generate a new authentication URL.\n\nUse this if your device was revoked from Tailscale admin.\n\nContinue?')) {
+                jQuery('#status-text').html('Logging out and generating new auth URL...');
+                
+                // Call logout action first
+                jQuery.post(apiBase + '&action=logout', function(logoutData) {
+                    // Then get new auth URL
+                    setTimeout(function() {
+                        authenticateTailscale();
+                    }, 2000);
+                });
+            }
         }
 
         function connectTailscale() {

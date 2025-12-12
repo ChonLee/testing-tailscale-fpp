@@ -123,14 +123,72 @@ function getTailscaleStatus() {
     $textStatus = execCommand("sudo tailscale status 2>&1");
     $statusOutput = $textStatus['output'];
     
-    // Check if needs login/authentication
+    // Get detailed JSON status to check actual connection state
+    $jsonResult = execCommand("sudo tailscale status --json 2>&1");
+    $jsonStatus = null;
+    if ($jsonResult['return_code'] === 0) {
+        $jsonStatus = json_decode($jsonResult['output'], true);
+    }
+    
+    // Check if device is revoked/expired in JSON status
+    if ($jsonStatus && isset($jsonStatus['Self'])) {
+        $self = $jsonStatus['Self'];
+        
+        // Check for revoked or expired state
+        if (isset($self['KeyExpired']) && $self['KeyExpired'] === true) {
+            // Key expired, need to re-authenticate
+            execCommand("sudo tailscale logout 2>&1");
+            
+            $config = readConfig();
+            $hostname = $config['hostname'] ?? 'fpp-player';
+            $authResult = execCommand("timeout 3 sudo tailscale up --hostname={$hostname} 2>&1 || true");
+            $authUrl = null;
+            
+            if (preg_match('/https:\/\/login\.tailscale\.com\/[^\s\'"<>]+/', $authResult['output'], $matches)) {
+                $authUrl = $matches[0];
+            }
+            
+            return [
+                'connected' => false,
+                'daemon_running' => true,
+                'status' => 'Device revoked - authentication required',
+                'auth_url' => $authUrl
+            ];
+        }
+        
+        // Check if actually connected with valid IP
+        $hasIP = !empty($self['TailscaleIPs']) && !empty($self['TailscaleIPs'][0]);
+        $isOnline = isset($self['Online']) && $self['Online'] === true;
+        
+        if ($hasIP && $isOnline) {
+            return [
+                'connected' => true,
+                'daemon_running' => true,
+                'ip' => $self['TailscaleIPs'][0],
+                'hostname' => $self['HostName'] ?? 'N/A',
+                'status' => 'Connected',
+                'online' => true,
+                'auth_url' => null
+            ];
+        }
+    }
+    
+    // Not connected - check if needs login/authentication
+    // Look for various "not logged in" indicators
     if (strpos($statusOutput, 'Logged out') !== false ||
         strpos($statusOutput, 'NeedsLogin') !== false ||
         strpos($statusOutput, 'run `tailscale up`') !== false ||
-        strpos($statusOutput, 'not logged in') !== false) {
+        strpos($statusOutput, 'not logged in') !== false ||
+        strpos($statusOutput, 'expired') !== false ||
+        strpos($statusOutput, 'revoked') !== false ||
+        empty($statusOutput) ||
+        trim($statusOutput) === '') {
         
-        // Try to get auth URL with short timeout to avoid hanging
-        $authResult = execCommand("timeout 3 sudo tailscale up --hostname=fpp-player 2>&1 || true");
+        // Definitely needs auth - try to get URL
+        $config = readConfig();
+        $hostname = $config['hostname'] ?? 'fpp-player';
+        
+        $authResult = execCommand("timeout 3 sudo tailscale up --hostname={$hostname} 2>&1 || true");
         $authUrl = null;
         
         // Extract URL from output
@@ -146,38 +204,11 @@ function getTailscaleStatus() {
         ];
     }
     
-    // Get detailed JSON status
-    $result = execCommand("sudo tailscale status --json");
-    
-    if ($result['return_code'] === 0) {
-        $status = json_decode($result['output'], true);
-        
-        if ($status && isset($status['Self'])) {
-            $self = $status['Self'];
-            
-            // Check if actually online and has an IP
-            $hasIP = !empty($self['TailscaleIPs']) && !empty($self['TailscaleIPs'][0]);
-            $isOnline = isset($self['Online']) && $self['Online'] === true;
-            
-            if ($hasIP && $isOnline) {
-                return [
-                    'connected' => true,
-                    'daemon_running' => true,
-                    'ip' => $self['TailscaleIPs'][0],
-                    'hostname' => $self['HostName'] ?? 'N/A',
-                    'status' => 'Connected',
-                    'online' => true,
-                    'auth_url' => null
-                ];
-            }
-        }
-    }
-    
-    // Default to disconnected
+    // Disconnected - show helpful message
     return [
         'connected' => false,
         'daemon_running' => true,
-        'status' => 'Disconnected'
+        'status' => 'Disconnected (click Connect, or use Authenticate if device was revoked)'
     ];
 }
 
@@ -307,6 +338,22 @@ try {
         case 'disconnect':
             $result = disconnectTailscale();
             echo json_encode($result);
+            break;
+            
+        case 'logout':
+            $result = execCommand("sudo tailscale logout 2>&1");
+            echo json_encode([
+                'success' => $result['return_code'] === 0,
+                'message' => $result['output']
+            ]);
+            break;
+            
+        case 'getSystemInfo':
+            $systemHostname = trim(shell_exec('hostname') ?: 'unknown');
+            echo json_encode([
+                'success' => true,
+                'hostname' => $systemHostname
+            ]);
             break;
             
         case 'getLogs':
