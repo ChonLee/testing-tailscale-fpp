@@ -4,7 +4,7 @@
 # Ensures tailscaled is running when FPP starts
 #
 
-PLUGIN_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
+CONFIG_FILE="/home/fpp/media/config/plugin.testing-tailscale-fpp"
 LOG_FILE="/var/log/fpp-tailscale.log"
 
 log() {
@@ -13,11 +13,11 @@ log() {
 
 log "=== FPP Start - Tailscale Plugin ==="
 
-# Read config value helper
+# Read config value helper for INI files
 get_config_value() {
     local key=$1
-    if [ -f "${PLUGIN_DIR}/config.json" ]; then
-        python3 -c "import json; print(json.load(open('${PLUGIN_DIR}/config.json')).get('$key', ''))" 2>/dev/null
+    if [ -f "$CONFIG_FILE" ]; then
+        grep "^${key}\s*=" "$CONFIG_FILE" | cut -d'=' -f2- | tr -d ' '
     fi
 }
 

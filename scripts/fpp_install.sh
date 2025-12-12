@@ -36,19 +36,22 @@ fi
 log "Creating directories..."
 mkdir -p /var/lib/tailscale
 mkdir -p /var/run/tailscale
+mkdir -p /home/fpp/media/config
 chmod 755 /var/lib/tailscale /var/run/tailscale
 
-# Create default config
-if [ ! -f "${PLUGIN_DIR}/config.json" ]; then
-    log "Creating default configuration..."
-    cat > "${PLUGIN_DIR}/config.json" << 'EOF'
-{
-    "auto_connect": false,
-    "accept_routes": false,
-    "advertise_exit": false,
-    "hostname": "fpp-player"
-}
+# Create default config in FPP standard location
+CONFIG_FILE="/home/fpp/media/config/plugin.testing-tailscale-fpp"
+if [ ! -f "$CONFIG_FILE" ]; then
+    log "Creating default configuration at $CONFIG_FILE..."
+    cat > "$CONFIG_FILE" << 'EOF'
+; Tailscale Plugin Configuration
+auto_connect = false
+accept_routes = false
+advertise_exit = false
+hostname = fpp-player
 EOF
+    chmod 644 "$CONFIG_FILE"
+    log "Default configuration created"
 fi
 
 # Enable and start Tailscale service

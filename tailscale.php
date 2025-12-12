@@ -158,6 +158,7 @@
                 </div>
                 
                 <div>
+                    <button id="btn-authenticate" class="button" onclick="authenticateTailscale()" style="display:none;">🔑 Authenticate</button>
                     <button id="btn-connect" class="button" onclick="connectTailscale()">Connect</button>
                     <button id="btn-disconnect" class="button danger" onclick="disconnectTailscale()">Disconnect</button>
                     <button id="btn-refresh" class="button secondary" onclick="refreshStatus()">Refresh Status</button>
@@ -227,11 +228,22 @@
                 hostname: jQuery('#hostname-input').val()
             };
             
-            jQuery.post(apiBase + '&action=saveConfig', JSON.stringify(config), function(data) {
-                if (data.success) {
-                    alert('Configuration saved successfully!');
-                } else {
-                    alert('Error saving configuration: ' + data.message);
+            jQuery.ajax({
+                url: apiBase + '&action=saveConfig',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(config),
+                dataType: 'json',
+                success: function(data) {
+                    if (data.success) {
+                        alert('Configuration saved successfully!');
+                    } else {
+                        alert('Error saving configuration: ' + data.message);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    alert('Error saving configuration: ' + error);
+                    console.error('Save error:', xhr.responseText);
                 }
             });
         }
@@ -251,26 +263,68 @@
                         jQuery('#tailscale-ip').text(status.ip || 'N/A');
                         jQuery('#hostname').text(status.hostname || 'N/A');
                         jQuery('#connection-status').text(status.status || 'Connected');
+                        jQuery('#btn-authenticate').hide();
                         jQuery('#btn-connect').hide();
                         jQuery('#btn-disconnect').show();
                         jQuery('#auth-url-box').hide();
                     } else {
                         jQuery('#status-box').removeClass('connected').addClass('disconnected');
-                        jQuery('#status-text').html('<strong>✗ Disconnected from Tailscale</strong>');
                         jQuery('#connection-info').hide();
-                        jQuery('#btn-connect').show();
                         jQuery('#btn-disconnect').hide();
                         
+                        // Check if we need authentication (auth_url present)
                         if (status.auth_url) {
+                            jQuery('#status-text').html('<strong>✗ Authentication Required</strong><br><small>' + (status.status || 'Not logged in') + '</small>');
+                            jQuery('#btn-authenticate').show();
+                            jQuery('#btn-connect').hide();
                             jQuery('#auth-url-box').show();
                             jQuery('#auth-url-link').attr('href', status.auth_url).text(status.auth_url);
                         } else {
+                            jQuery('#status-text').html('<strong>✗ Disconnected from Tailscale</strong><br><small>' + (status.status || 'Ready to connect') + '</small>');
+                            jQuery('#btn-authenticate').hide();
+                            jQuery('#btn-connect').show();
                             jQuery('#auth-url-box').hide();
                         }
                     }
                 } else {
                     jQuery('#status-box').removeClass('connected').addClass('disconnected');
-                    jQuery('#status-text').html('<strong>Error:</strong> ' + data.message);
+                    jQuery('#status-text').html('<strong>Error:</strong> ' + (data.message || 'Unknown error'));
+                }
+            }).fail(function(xhr, status, error) {
+                jQuery('#loading').hide();
+                jQuery('#content').show();
+                jQuery('#status-box').removeClass('connected').addClass('disconnected');
+                jQuery('#status-text').html('<strong>Error loading status:</strong> ' + error);
+                console.error('API Error:', xhr.responseText);
+            });
+        }
+
+        function authenticateTailscale() {
+            jQuery('#status-text').html('Generating authentication URL...');
+            jQuery.post(apiBase + '&action=connect', function(data) {
+                if (data.auth_url) {
+                    // Show the auth URL
+                    jQuery('#status-text').html('<strong>✗ Authentication Required</strong>');
+                    jQuery('#auth-url-box').show();
+                    jQuery('#auth-url-link').attr('href', data.auth_url).text(data.auth_url);
+                    
+                    // Open in new window
+                    window.open(data.auth_url, '_blank');
+                    
+                    // Poll for status after authentication
+                    alert('Opening Tailscale authentication in new window.\n\nAfter authenticating, click "Refresh Status" or wait a moment.');
+                    
+                    // Auto-refresh after 10 seconds to check if authenticated
+                    setTimeout(function() {
+                        refreshStatus();
+                    }, 10000);
+                } else if (data.success) {
+                    // Already authenticated, just connected
+                    alert('Already authenticated! Connecting...');
+                    setTimeout(refreshStatus, 2000);
+                } else {
+                    alert('Error: ' + data.message);
+                    refreshStatus();
                 }
             });
         }

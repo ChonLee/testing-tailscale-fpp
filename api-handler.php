@@ -8,13 +8,16 @@
 
 header('Content-Type: application/json');
 
-$PLUGIN_DIR = "/opt/fpp/plugins/testing-tailscale-fpp";
-if (!is_dir($PLUGIN_DIR)) {
-    $PLUGIN_DIR = "/home/fpp/media/plugins/testing-tailscale-fpp";
-}
-
-$CONFIG_FILE = "$PLUGIN_DIR/config.json";
+// Use FPP's standard config directory
+$PLUGIN_NAME = "testing-tailscale-fpp";
+$CONFIG_DIR = "/home/fpp/media/config";
+$CONFIG_FILE = "$CONFIG_DIR/plugin.$PLUGIN_NAME";
 $LOG_FILE = "/var/log/fpp-tailscale.log";
+
+// Ensure config directory exists
+if (!is_dir($CONFIG_DIR)) {
+    mkdir($CONFIG_DIR, 0755, true);
+}
 
 /**
  * Execute a shell command and return output
@@ -28,30 +31,54 @@ function execCommand($cmd) {
 }
 
 /**
- * Read configuration file
+ * Read configuration file (INI format)
  */
 function readConfig() {
     global $CONFIG_FILE;
     
-    if (file_exists($CONFIG_FILE)) {
-        $config = json_decode(file_get_contents($CONFIG_FILE), true);
-        return $config ?: [];
-    }
-    
-    return [
+    $defaults = [
         'auto_connect' => false,
         'accept_routes' => false,
         'advertise_exit' => false,
         'hostname' => 'fpp-player'
     ];
+    
+    if (file_exists($CONFIG_FILE)) {
+        $config = parse_ini_file($CONFIG_FILE);
+        if ($config !== false) {
+            // Convert string "true"/"false" to boolean
+            foreach ($config as $key => $value) {
+                if ($value === 'true' || $value === '1') {
+                    $config[$key] = true;
+                } elseif ($value === 'false' || $value === '0') {
+                    $config[$key] = false;
+                }
+            }
+            return array_merge($defaults, $config);
+        }
+    }
+    
+    return $defaults;
 }
 
 /**
- * Write configuration file
+ * Write configuration file (INI format)
  */
 function writeConfig($config) {
     global $CONFIG_FILE;
-    return file_put_contents($CONFIG_FILE, json_encode($config, JSON_PRETTY_PRINT)) !== false;
+    
+    $iniContent = "; Tailscale Plugin Configuration\n";
+    $iniContent .= "; Generated: " . date('Y-m-d H:i:s') . "\n\n";
+    
+    foreach ($config as $key => $value) {
+        // Convert boolean to string
+        if (is_bool($value)) {
+            $value = $value ? 'true' : 'false';
+        }
+        $iniContent .= "$key = $value\n";
+    }
+    
+    return file_put_contents($CONFIG_FILE, $iniContent) !== false;
 }
 
 /**
@@ -75,14 +102,15 @@ function getTailscaleStatus() {
     // Check if needs login/authentication
     if (strpos($statusOutput, 'Logged out') !== false ||
         strpos($statusOutput, 'NeedsLogin') !== false ||
-        strpos($statusOutput, 'run `tailscale up`') !== false) {
+        strpos($statusOutput, 'run `tailscale up`') !== false ||
+        strpos($statusOutput, 'not logged in') !== false) {
         
-        // Try to get auth URL
-        $authResult = execCommand("sudo tailscale up --timeout=1s 2>&1 || true");
+        // Try to get auth URL with short timeout to avoid hanging
+        $authResult = execCommand("timeout 3 sudo tailscale up --hostname=fpp-player 2>&1 || true");
         $authUrl = null;
         
         // Extract URL from output
-        if (preg_match('/https:\/\/login\.tailscale\.com\/[^\s]+/', $authResult['output'], $matches)) {
+        if (preg_match('/https:\/\/login\.tailscale\.com\/[^\s\'"<>]+/', $authResult['output'], $matches)) {
             $authUrl = $matches[0];
         }
         
@@ -207,16 +235,42 @@ try {
             break;
             
         case 'saveConfig':
-            $input = json_decode(file_get_contents('php://input'), true);
-            if ($input && writeConfig($input)) {
+            // Get input from raw POST data
+            $rawInput = file_get_contents('php://input');
+            $input = json_decode($rawInput, true);
+            
+            // Debug logging
+            error_log("Tailscale saveConfig - Raw input: " . substr($rawInput, 0, 200));
+            error_log("Tailscale saveConfig - Parsed: " . print_r($input, true));
+            error_log("Tailscale saveConfig - Config file: " . $CONFIG_FILE);
+            
+            if (!$input) {
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'Invalid JSON input'
+                ]);
+                break;
+            }
+            
+            // Ensure config file is writable
+            if (file_exists($CONFIG_FILE) && !is_writable($CONFIG_FILE)) {
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'Config file not writable: ' . $CONFIG_FILE
+                ]);
+                break;
+            }
+            
+            if (writeConfig($input)) {
                 echo json_encode([
                     'success' => true,
                     'message' => 'Configuration saved successfully'
                 ]);
             } else {
+                $error = error_get_last();
                 echo json_encode([
                     'success' => false,
-                    'message' => 'Failed to save configuration'
+                    'message' => 'Failed to write config file: ' . ($error['message'] ?? 'Unknown error')
                 ]);
             }
             break;
